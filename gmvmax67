@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GMV Max Dashboard</title>
+    
+    <!-- PWA / App Configuration -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GMV Max">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="description" content="Dashboard tối ưu quảng cáo TikTok Shop GMV Max">
+    
+    <!-- App Icon (Embedded SVG for simplicity) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text x=%2250%22 y=%2250%22 dominant-baseline=%22central%22 text-anchor=%22middle%22 font-size=%2270%22>🎵</text></svg>">
+
+    <!-- Embedded Manifest for PWA Installability -->
+    <link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiR01WIE1heCBEYXNoYm9hcmQiLCJzaG9ydF9uYW1lIjoiR01WIE1heCIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29xvciI6IiNmM2Y0ZjYiLCJ0aGVtZV9jb2xvciI6IiMyNTYzZWIiLCJpY29ucyI6W3sic3JjIjoiZGF0YTppbWFnZS9zdmcreG1sLDxzdmcgeG1sbnM9XCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1wiIHZpZXdCb3g9XCIwIDAgMTAwIDEwMFwiPjxyZWN0IHdpZHRoPVwiMTAwXCIgaGVpZ2h0PVwiMTAwXCIgZmlsbD1cImJsYWNrXCIvPjx0ZXh0IHg9XCI1MFwiIHk9XCI1MFwiIGRvbWluYW50LWJhc2VsaW5lPVwiY2VudHJhbFwiIHRleHQtYW5jaG9yPVwibWlkZGxlXCIgZm9udC1zaXplPVwiNzBcIj7wn4u1PC90ZXh0Pjwvc3ZnPiIsInR5cGUiOiJpbWFnZS9zdmcreG1sIiwic2l6ZXMiOiIxOTJ4MTkyIn1dfQ==">
+
+    <!-- Libraries (Standard CDNs) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Base Settings */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f3f4f6; 
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile app */
+        }
+        
+        /* SafeArea for iPhone X+ */
+        header { padding-top: env(safe-area-inset-top); }
+        main { padding-bottom: calc(env(safe-area-inset-bottom) + 20px); }
+
+        /* Tab Styles */
+        .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 700; background-color: #eff6ff; }
+        .tab-inactive { color: #6b7280; }
+        .tab-inactive:hover { color: #374151; background-color: #f9fafb; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Logic Styles */
+        .editing-row { background-color: #fff7ed !important; border-left: 4px solid #f97316; }
+        .sku-block { transition: all 0.3s ease; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
+        /* Toast Notification */
+        #toast { visibility: hidden; min-width: 250px; background-color: #1f2937; color: #fff; text-align: center; border-radius: 50px; padding: 12px 20px; position: fixed; z-index: 9999; left: 50%; bottom: 80px; transform: translateX(-50%); font-size: 14px; opacity: 0; transition: opacity 0.3s, bottom 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-weight: 500; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 100px; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 640px) {
+            .index-badge { width: 24px; height: 24px; font-size: 11px; line-height: 24px; }
+            input, select { font-size: 16px !important; /* Prevent iOS zoom */ } 
+            .mobile-full-width { width: 100%; }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Notification Toast -->
+    <div id="toast"><i class="fa-solid fa-check-circle mr-2 text-green-400"></i> <span id="toastMsg">Thông báo</span></div>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+
+    <!-- Header -->
+    <header class="bg-white shadow-md z-40 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row justify-between items-center py-3 gap-2">
+                <!-- Logo & Title -->
+                <div class="flex items-center w-full sm:w-auto justify-between">
+                    <div class="flex items-center select-none cursor-pointer" onclick="switchTab('overview')">
+                        <div class="bg-black text-white p-2 rounded-lg mr-3 shadow-lg">
+                            <i class="fa-brands fa-tiktok text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-lg font-bold text-gray-900 leading-tight">GMV Max</h1>
+                            <p class="text-[10px] font-medium text-blue-600">Analytics App</p>
+                        </div>
+                    </div>
+                    <!-- Mobile Data Actions -->
+                    <div class="flex gap-2 sm:hidden">
+                        <button onclick="exportData()" class="bg-green-50 text-green-700 p-2 rounded-full h-8 w-8 flex items-center justify-center border border-green-100 shadow-sm"><i class="fa-solid fa-download text-xs"></i></button>
+                        <button onclick="document.getElementById('importFile').click()" class="bg-yellow-50 text-yellow-700 p-2 rounded-full h-8 w-8 flex items-center justify-center border border-yellow-100 shadow-sm"><i class="fa-solid fa-upload text-xs"></i></button>
+                    </div>
+                </div>
+                
+                <!-- Controls -->
+                <div class="flex w-full sm:w-auto gap-2">
+                    <select id="globalShopFilter" onchange="updateCampFilter(); renderAll()" class="flex-1 sm:w-40 bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2 font-semibold h-9">
+                        <option value="all">🏢 Tất cả Shop</option>
+                        <option value="Shop A">Shop A</option>
+                        <option value="Shop B">Shop B</option>
+                        <option value="Shop C">Shop C</option>
+                    </select>
+                    <select id="globalCampFilter" onchange="renderAll()" class="flex-1 sm:w-48 bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2 font-medium truncate h-9">
+                        <option value="all">📊 Tất cả Camp</option>
+                    </select>
+                    <!-- Desktop Actions -->
+                    <div class="hidden sm:flex gap-1">
+                        <button onclick="exportData()" class="bg-green-100 text-green-700 p-2 rounded hover:bg-green-200 h-9 w-9 flex items-center justify-center transition" title="Backup"><i class="fa-solid fa-download"></i></button>
+                        <button onclick="document.getElementById('importFile').click()" class="bg-yellow-100 text-yellow-700 p-2 rounded hover:bg-yellow-200 h-9 w-9 flex items-center justify-center transition" title="Restore"><i class="fa-solid fa-upload"></i></button>
+                        <button onclick="clearData()" class="bg-red-100 text-red-700 p-2 rounded hover:bg-red-200 h-9 w-9 flex items-center justify-center transition" title="Reset"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white border-b border-gray-200 flex-shrink-0 z-30 shadow-sm overflow-x-auto scrollbar-hide">
+        <nav class="flex space-x-1 max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 min-w-full sm:min-w-0" aria-label="Tabs">
+            <button onclick="switchTab('input')" id="tab-input" class="tab-active flex-1 py-3 px-2 text-center border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200">
+                <i class="fa-solid fa-pen-to-square mr-1"></i> Nhập Liệu
+            </button>
+            <button onclick="switchTab('overview')" id="tab-overview" class="tab-inactive flex-1 py-3 px-2 text-center border-b-2 border-transparent font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200">
+                <i class="fa-solid fa-chart-pie mr-1"></i> Tổng Quan
+            </button>
+            <button onclick="switchTab('product')" id="tab-product" class="tab-inactive flex-1 py-3 px-2 text-center border-b-2 border-transparent font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200">
+                <i class="fa-solid fa-shirt mr-1"></i> SKU
+            </button>
+            <button onclick="switchTab('campaign')" id="tab-campaign" class="tab-inactive flex-1 py-3 px-2 text-center border-b-2 border-transparent font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200">
+                <i class="fa-solid fa-layer-group mr-1"></i> Camp
+            </button>
+            <button onclick="switchTab('creative')" id="tab-creative" class="tab-inactive flex-1 py-3 px-2 text-center border-b-2 border-transparent font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200">
+                <i class="fa-solid fa-video mr-1"></i> Video
+            </button>
+        </nav>
+    </div>
+
+    <!-- Main Content (Scrollable Area) -->
+    <main class="flex-1 overflow-y-auto bg-gray-50 p-2 sm:p-6 w-full">
+        <div class="max-w-7xl mx-auto pb-20">
+            
+            <!-- TAB 1: DATA INPUT -->
+            <div id="content-input" class="block animate-fade-in">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Form -->
+                    <div class="lg:col-span-5 bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-fit">
+                        <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                            <h2 class="text-base font-bold text-gray-800 flex items-center">
+                                <i class="fa-solid fa-plus-circle text-blue-600 mr-2"></i> Thêm Dữ Liệu
+                            </h2>
+                            <button onclick="resetForm()" id="btnCancelEdit" class="hidden text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition">Hủy sửa</button>
+                        </div>
+                        
+                        <form id="dataForm" onsubmit="handleFormSubmit(event)">
+                            <input type="hidden" id="inputId">
+
+                            <!-- Context -->
+                            <div class="bg-blue-50/50 p-3 rounded-lg mb-4 border border-blue-100">
+                                <label class="block text-[10px] font-bold text-blue-800 uppercase mb-2 tracking-wider">1. Thông tin Chung</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                                    <input type="date" id="inputDate" required class="w-full text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 border p-2 h-10 shadow-sm">
+                                    <select id="inputShop" class="w-full text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 border p-2 h-10 shadow-sm bg-white">
+                                        <option value="Shop A">Shop A</option>
+                                        <option value="Shop B">Shop B</option>
+                                        <option value="Shop C">Shop C</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" id="inputCampName" list="listCampNames" placeholder="Nhập tên Chiến Dịch..." required class="w-full text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 border p-2 h-10 font-medium text-gray-800 shadow-sm placeholder-gray-400">
+                                </div>
+                                <select id="inputCampType" class="w-full text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 border p-2 h-10 bg-white shadow-sm text-gray-600">
+                                    <option value="Multi-SKU">Dạng 1: Multi-SKU (Nhiều mã)</option>
+                                    <option value="Single-SKU">Dạng 2: Single-SKU (1 mã)</option>
+                                </select>
+                            </div>
+
+                            <!-- Metrics -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-end mb-2 px-1">
+                                    <label class="text-[10px] font-bold text-green-700 uppercase tracking-wider">2. Chỉ Số (Metrics)</label>
+                                    <span class="text-[10px] text-gray-400 italic">Nhập nhiều SKU cùng lúc</span>
+                                </div>
+                                
+                                <div id="metricsContainer" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1 pb-1 scrollbar-thin">
+                                    <!-- First Block -->
+                                    <div class="sku-block bg-white p-3 rounded-lg border border-gray-200 relative pt-6 shadow-sm">
+                                        <div class="absolute -left-2 -top-2 bg-blue-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-bold z-10 index-badge shadow ring-2 ring-white">1</div>
+                                        
+                                        <div class="space-y-2">
+                                            <input type="text" name="sku" list="listSkus" placeholder="Tên sản phẩm (SKU)..." required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 bg-green-50/50 font-medium focus:ring-1 focus:ring-green-500">
+                                            <input type="text" name="video" list="listVideos" placeholder="Mã Video..." required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 focus:ring-1 focus:ring-blue-500">
+                                            
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div class="relative"><span class="absolute left-2 top-2 text-xs text-gray-400">$</span><input type="number" name="cost" step="0.01" placeholder="Cost" required class="pl-4 w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right font-mono text-red-600 font-bold bg-red-50/30"></div>
+                                                <div class="relative"><span class="absolute left-2 top-2 text-xs text-gray-400">$</span><input type="number" name="gmv" step="0.01" placeholder="GMV" required class="pl-4 w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right font-mono text-green-600 font-bold bg-green-50/30"></div>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <input type="number" name="purchases" placeholder="Orders" required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right text-gray-700">
+                                                <input type="number" name="impressions" placeholder="Impressions" required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right text-gray-700">
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-1">
+                                                <input type="number" name="clicks" placeholder="Clicks" required class="w-full text-[11px] border-gray-300 rounded-md border p-1 h-8 text-right">
+                                                <input type="number" name="views2s" placeholder="2s View" required class="w-full text-[11px] border-gray-300 rounded-md border p-1 h-8 text-right">
+                                                <input type="number" name="views3s" placeholder="3s View" required class="w-full text-[11px] border-blue-200 bg-blue-50 rounded-md border p-1 h-8 text-right font-semibold text-blue-700">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="button" id="btnAddSku" onclick="addSkuBlock()" class="mt-3 w-full border-2 border-dashed border-gray-300 text-gray-500 font-bold py-3 rounded-xl hover:bg-gray-50 hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center active:scale-95">
+                                    <i class="fa-solid fa-plus mr-2"></i> Thêm SKU khác
+                                </button>
+                            </div>
+
+                            <button type="submit" id="btnSubmit" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-200 hover:shadow-blue-300 active:scale-95 transition-all flex justify-center items-center text-sm uppercase tracking-wide">
+                                <i class="fa-solid fa-floppy-disk mr-2"></i> Lưu Dữ Liệu
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- History Table -->
+                    <div class="lg:col-span-7 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col h-[500px] lg:h-auto">
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-sm font-bold text-gray-800">Lịch sử nhập gần đây</h2>
+                            <span id="recordCount" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">0</span>
+                        </div>
+                        <div class="overflow-auto flex-1 border rounded-lg scrollbar-thin">
+                            <table class="min-w-full divide-y divide-gray-100">
+                                <thead class="bg-gray-50 sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-2 py-2 text-left text-[9px] font-bold text-gray-500 uppercase">Ngày/Shop</th>
+                                        <th class="px-2 py-2 text-left text-[9px] font-bold text-gray-500 uppercase">Camp</th>
+                                        <th class="px-2 py-2 text-left text-[9px] font-bold text-gray-500 uppercase">SKU</th>
+                                        <th class="px-2 py-2 text-right text-[9px] font-bold text-gray-500 uppercase">GMV</th>
+                                        <th class="px-2 py-2 text-center text-[9px] font-bold text-gray-500 uppercase">Sửa</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rawDataTableBody" class="bg-white divide-y divide-gray-50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: OVERVIEW -->
+            <div id="content-overview" class="hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" id="shopPerformanceContainer"></div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <h3 class="text-xs font-bold text-gray-600 uppercase mb-3 text-center">Tỷ trọng Chi Phí (Cost)</h3>
+                        <div class="relative h-48 w-full"><canvas id="chartPie"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <h3 class="text-xs font-bold text-gray-600 uppercase mb-3">Xu hướng ROI (7 ngày)</h3>
+                        <div class="relative h-48 w-full"><canvas id="chartTrend"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="bg-green-50 px-3 py-2 border-b border-green-100 font-bold text-xs text-green-800 flex justify-between"><span>🏆 Top Hiệu Quả (ROI > 0)</span></div>
+                        <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-2 text-left">SKU</th><th class="p-2 text-right">Lãi Gộp</th><th class="p-2 text-center">ROI</th></tr></thead><tbody id="topSkuBody"></tbody></table></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="bg-red-50 px-3 py-2 border-b border-red-100 font-bold text-xs text-red-800 flex justify-between"><span>⚠️ Cần Xử Lý (ROI < 0)</span></div>
+                        <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-2 text-left">SKU</th><th class="p-2 text-right">Lỗ</th><th class="p-2 text-center">ROI</th></tr></thead><tbody id="badSkuBody"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: PRODUCT -->
+            <div id="content-product" class="hidden">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                        <h2 class="font-bold text-sm text-gray-800">Phân Tích SKU</h2>
+                        <div class="flex bg-white rounded-lg p-1 border border-gray-200">
+                            <button onclick="setSkuMode('global')" id="btnSkuGlobal" class="px-3 py-1 text-[10px] font-bold rounded bg-blue-50 text-blue-600 transition">Tổng</button>
+                            <button onclick="setSkuMode('detailed')" id="btnSkuDetailed" class="px-3 py-1 text-[10px] font-bold rounded text-gray-500 transition">Chi tiết</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="bg-white border-b">
+                                <tr>
+                                    <th class="px-3 py-3 text-left font-bold text-gray-500">SKU</th>
+                                    <th id="colCampName" class="px-3 py-3 text-left font-bold text-gray-500 hidden">Camp</th>
+                                    <th class="px-3 py-3 text-right font-bold text-gray-500">Cost</th>
+                                    <th class="px-3 py-3 text-right font-bold text-gray-500">GMV</th>
+                                    <th class="px-3 py-3 text-center font-bold text-gray-500">ROI</th>
+                                    <th class="px-3 py-3 text-left font-bold text-gray-500">Gợi ý</th>
+                                </tr>
+                            </thead>
+                            <tbody id="skuTableBody" class="divide-y divide-gray-50"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: CAMPAIGN -->
+            <div id="content-campaign" class="hidden">
+                <div id="campaignHealthContainer" class="space-y-4"></div>
+            </div>
+
+            <!-- TAB 5: CREATIVE -->
+            <div id="content-creative" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
+                        <h3 class="text-xs font-bold text-gray-600 uppercase mb-2">Ma Trận Video</h3>
+                        <div class="relative h-full w-full"><canvas id="chartVideoScatter"></canvas></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-[500px]">
+                        <div class="p-3 border-b border-gray-100 bg-gray-50">
+                            <select id="videoSort" onchange="renderCreativeAnalysis()" class="w-full text-xs border border-gray-300 rounded p-2 bg-white">
+                                <option value="viral3s">🔥 Top 3s Views (Hook)</option>
+                                <option value="viral">👀 Top Views Tổng</option>
+                                <option value="spend">💰 Top Spend</option>
+                                <option value="roas">💎 Top ROAS</option>
+                            </select>
+                        </div>
+                        <div id="videoList" class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50/50"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- 1. CONFIG ---
+        let appData = [];
+        try { const s = localStorage.getItem('gmv_max_data'); if(s) appData = JSON.parse(s); } catch(e){ appData=[]; }
+        let editingId = null, skuMode = 'global', charts = {};
+        const formatMoney = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n);
+        const formatNum = (n) => new Intl.NumberFormat('en-US').format(n);
+
+        // --- 2. CORE ---
+        document.addEventListener('DOMContentLoaded', () => { 
+            const d = document.getElementById('inputDate'); if(d) d.valueAsDate = new Date(); 
+            renderAll(); updateDatalists(); 
+        });
+
+        function saveData() { 
+            try { localStorage.setItem('gmv_max_data', JSON.stringify(appData)); showToast("Đã lưu!"); } 
+            catch(e) { alert("Bộ nhớ đầy!"); } 
+        }
+        function showToast(m) { const t=document.getElementById('toast'); document.getElementById('toastMsg').innerText=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const date = document.getElementById('inputDate').value;
+            const shop = document.getElementById('inputShop').value;
+            const campName = document.getElementById('inputCampName').value;
+            if(!date || !shop || !campName) return alert("Thiếu thông tin chung!");
+
+            const newRecs = [];
+            document.querySelectorAll('.sku-block').forEach(b => {
+                const sku = b.querySelector('[name="sku"]').value.trim();
+                if(!sku) return;
+                
+                // Check dup
+                if(!editingId) {
+                    const exists = appData.find(i => i.sku===sku && i.shop===shop && i.date===date && i.campName!==campName);
+                    if(exists && !confirm(`SKU "${sku}" đã chạy ở Camp "${exists.campName}". Thêm tiếp?`)) return;
+                }
+
+                newRecs.push({
+                    id: editingId || Date.now() + Math.random(), date, shop, campName, campType: document.getElementById('inputCampType').value, sku,
+                    video: b.querySelector('[name="video"]').value||'',
+                    cost: parseFloat(b.querySelector('[name="cost"]').value)||0,
+                    gmv: parseFloat(b.querySelector('[name="gmv"]').value)||0,
+                    purchases: parseInt(b.querySelector('[name="purchases"]').value)||0,
+                    impressions: parseInt(b.querySelector('[name="impressions"]').value)||0,
+                    clicks: parseInt(b.querySelector('[name="clicks"]').value)||0,
+                    views2s: parseInt(b.querySelector('[name="views2s"]').value)||0,
+                    views3s: parseInt(b.querySelector('[name="views3s"]').value)||0,
+                });
+            });
+
+            if(!newRecs.length) return alert("Chưa nhập SKU!");
+            
+            if(editingId) {
+                const idx = appData.findIndex(i => i.id === editingId);
+                if(idx !== -1) appData[idx] = newRecs[0];
+                resetForm();
+            } else {
+                appData.push(...newRecs);
+                // Clear metric inputs only
+                document.querySelectorAll('.sku-block input').forEach(i => i.value = '');
+            }
+            saveData(); renderAll(); updateDatalists();
+        }
+
+        // --- 3. RENDER ---
+        function renderAll() {
+            renderInputTable(); renderOverview(); renderProduct(); renderCamp(); renderCreative();
+            const s = document.getElementById('globalShopFilter').value;
+            const c = document.getElementById('globalCampFilter').value;
+            document.getElementById('viewContext').innerText = (s==='all'?'Tất cả Shop':s) + (c!=='all'?' > '+c:'');
+        }
+
+        function getFiltered() {
+            const s = document.getElementById('globalShopFilter').value;
+            const c = document.getElementById('globalCampFilter').value;
+            return appData.filter(i => (s==='all'||i.shop===s) && (c==='all'||i.campName===c));
+        }
+
+        function renderInputTable() {
+            const d = getFiltered().sort((a,b)=>b.id-a.id).slice(0,50);
+            document.getElementById('recordCount').innerText = d.length;
+            document.getElementById('rawDataTableBody').innerHTML = d.map(i => `
+                <tr class="border-b hover:bg-gray-50 ${editingId===i.id?'bg-orange-50 border-l-2 border-orange-500':''}">
+                    <td class="px-2 py-2"><div class="text-[9px] text-gray-400">${i.date}</div><div class="text-[10px] font-bold text-gray-700">${i.shop}</div></td>
+                    <td class="px-2 py-2"><div class="text-[10px] text-blue-600 truncate w-20" title="${i.campName}">${i.campName}</div></td>
+                    <td class="px-2 py-2"><div class="text-[10px] font-bold text-gray-800 truncate w-16">${i.sku}</div><div class="text-[8px] text-gray-400 truncate w-16">${i.video}</div></td>
+                    <td class="px-2 py-2 text-right"><div class="text-[10px] font-bold text-green-600">${formatMoney(i.gmv)}</div><div class="text-[9px] text-red-400">-${formatMoney(i.cost)}</div></td>
+                    <td class="px-2 py-2 text-center"><button onclick="editRow(${i.id})" class="text-blue-500 px-2"><i class="fa-solid fa-pen text-xs"></i></button><button onclick="delRow(${i.id})" class="text-red-400 px-1"><i class="fa-solid fa-trash text-xs"></i></button></td>
+                </tr>`).join('');
+        }
+
+        function renderOverview() {
+            const d = getFiltered();
+            document.getElementById('shopPerformanceContainer').innerHTML = ['Shop A','Shop B','Shop C'].map(s => {
+                const sub = appData.filter(i => i.shop===s);
+                const cost = sub.reduce((a,b)=>a+b.cost,0), gmv = sub.reduce((a,b)=>a+b.gmv,0);
+                const roi = cost>0?(gmv-cost)/cost:0;
+                const col = roi<0?'text-red-500':(roi<1.5?'text-yellow-600':'text-green-600');
+                return `<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100"><div class="flex justify-between mb-1"><span class="font-bold text-xs text-gray-700">${s}</span><span class="text-[10px] font-bold ${col} bg-gray-50 px-2 rounded">ROI: ${roi.toFixed(2)}</span></div><div class="flex justify-between text-[10px] text-gray-500"><span>Cost: <b class="text-gray-800">${formatMoney(cost)}</b></span><span>GMV: <b class="text-gray-800">${formatMoney(gmv)}</b></span></div></div>`
+            }).join('');
+
+            // Chart Pie
+            const ctxP = document.getElementById('chartPie').getContext('2d');
+            if(charts.pie) charts.pie.destroy();
+            const costs = ['Shop A','Shop B','Shop C'].map(s => appData.filter(i=>i.shop===s).reduce((a,b)=>a+b.cost,0));
+            charts.pie = new Chart(ctxP, { type:'doughnut', data:{labels:['A','B','C'], datasets:[{data:costs, backgroundColor:['#3b82f6','#ef4444','#10b981']}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{size:10}}}}}});
+
+            // Chart Trend
+            const ctxT = document.getElementById('chartTrend').getContext('2d');
+            if(charts.trend) charts.trend.destroy();
+            const dates = [...new Set(d.map(i=>i.date))].sort().slice(-7);
+            const rois = dates.map(dt => { const sub=d.filter(i=>i.date===dt); const c=sub.reduce((a,b)=>a+b.cost,0); return c>0?(sub.reduce((a,b)=>a+b.gmv,0)-c)/c:0; });
+            charts.trend = new Chart(ctxT, { type:'line', data:{labels:dates, datasets:[{label:'ROI', data:rois, borderColor:'#2563eb', borderWidth:2, tension:0.3, pointRadius:2}]}, options:{responsive:true, maintainAspectRatio:false, scales:{x:{display:false}, y:{grid:{display:true}}}}});
+
+            // Top/Bad Lists
+            const skuMap={}; d.forEach(i=>{ if(!skuMap[i.sku]) skuMap[i.sku]={c:0,g:0}; skuMap[i.sku].c+=i.cost; skuMap[i.sku].g+=i.gmv; });
+            const list = Object.keys(skuMap).map(k=>{ const s=skuMap[k]; return {n:k, p:s.g-s.c, r:s.c>0?(s.g-s.c)/s.c:-1} });
+            document.getElementById('topSkuBody').innerHTML = list.filter(i=>i.r>0).sort((a,b)=>b.r-a.r).slice(0,5).map(i=>`<tr class="border-b"><td class="p-2 truncate w-24">${i.n}</td><td class="p-2 text-right text-green-600 font-bold">+${formatMoney(i.p)}</td><td class="p-2 text-center text-xs font-bold text-green-600 bg-green-50 rounded">${i.r.toFixed(2)}</td></tr>`).join('');
+            document.getElementById('badSkuBody').innerHTML = list.filter(i=>i.r<0).sort((a,b)=>a.r-b.r).slice(0,5).map(i=>`<tr class="border-b"><td class="p-2 truncate w-24">${i.n}</td><td class="p-2 text-right text-red-500 font-bold">${formatMoney(i.p)}</td><td class="p-2 text-center text-xs font-bold text-red-500 bg-red-50 rounded">${i.r.toFixed(2)}</td></tr>`).join('');
+        }
+
+        function renderProduct() {
+            const d = getFiltered();
+            const map = {}; 
+            d.forEach(i => { const k = skuMode==='global'?i.sku:i.sku+i.campName; if(!map[k]) map[k]={s:i.sku, c:i.campName, cost:0, gmv:0, ord:0}; map[k].cost+=i.cost; map[k].gmv+=i.gmv; map[k].ord+=i.purchases; });
+            document.getElementById('skuTableBody').innerHTML = Object.values(map).sort((a,b)=>b.cost-a.cost).map(r => {
+                const roi = r.cost>0?(r.gmv-r.cost)/r.cost:-1;
+                const col = roi<0?'text-red-500':(roi<1.5?'text-orange-500':'text-green-600');
+                return `<tr class="border-b hover:bg-gray-50"><td class="px-3 py-2 font-bold text-gray-700">${r.s}</td><td class="px-3 py-2 text-blue-500 text-[10px] ${skuMode==='global'?'hidden':''}">${r.c}</td><td class="px-3 py-2 text-right font-mono text-gray-600">${formatMoney(r.cost)}</td><td class="px-3 py-2 text-right font-mono text-gray-600">${formatMoney(r.gmv)}</td><td class="px-3 py-2 text-center text-gray-600">${r.ord}</td><td class="px-3 py-2 text-center font-bold ${col}">${roi.toFixed(2)}</td><td class="px-3 py-2 text-[10px] text-gray-400 italic">${roi<0?'Tắt':roi<2?'Opt':'Scale'}</td></tr>`;
+            }).join('');
+        }
+
+        function renderCamp() {
+            const d = getFiltered();
+            const shops = [...new Set(d.map(i=>i.shop))];
+            document.getElementById('campaignHealthContainer').innerHTML = shops.map(s => {
+                const sub = d.filter(i=>i.shop===s); if(!sub.length) return '';
+                const cm = {}; sub.forEach(i=>{ if(!cm[i.campName]) cm[i.campName]={c:0,g:0,t:i.campType}; cm[i.campName].c+=i.cost; cm[i.campName].g+=i.gmv; });
+                const rows = Object.entries(cm).map(([k,v]) => { const r=v.c>0?(v.g-v.c)/v.c:-1; return `<tr class="border-b text-xs"><td class="p-2 truncate max-w-[120px] font-medium text-gray-700">${k}</td><td class="p-2 text-center text-gray-400">${v.t==='Multi-SKU'?'M':'S'}</td><td class="p-2 text-right font-mono">${formatMoney(v.c)}</td><td class="p-2 text-center font-bold ${r<0?'text-red-500':'text-green-600'}">${r.toFixed(2)}</td></tr>`; }).join('');
+                return `<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"><div class="bg-gray-50 px-3 py-2 border-b font-bold text-xs text-gray-700 uppercase">${s}</div><table class="w-full"><tbody>${rows}</tbody></table></div>`;
+            }).join('');
+        }
+
+        function renderCreative() {
+            const d = getFiltered();
+            const map = {}; d.forEach(i=>{ if(!map[i.video]) map[i.video]={c:0,g:0,v3:0}; map[i.video].c+=i.cost; map[i.video].g+=i.gmv; map[i.video].v3+=(i.views3s||0); });
+            const arr = Object.entries(map).map(([k,v])=>({k, ...v, r:v.c>0?v.g/v.c:0}));
+            
+            // Scatter
+            const ctx = document.getElementById('chartVideoScatter').getContext('2d');
+            if(charts.sc) charts.sc.destroy();
+            charts.sc = new Chart(ctx, { type:'bubble', data:{datasets:[{label:'Video', data:arr.map(v=>({x:v.r, y:v.v3, r:Math.min(v.c/10,20)})).filter(p=>p.y>0), backgroundColor:'rgba(59,130,246,0.6)'}]}, options:{responsive:true, maintainAspectRatio:false, scales:{x:{title:{display:true,text:'ROAS'}}, y:{title:{display:true,text:'3s Views'}}}, plugins:{legend:{display:false}}} });
+
+            // List
+            const sort = document.getElementById('videoSort').value;
+            const sorted = arr.sort((a,b) => sort==='viral3s'?b.v3-a.v3 : sort==='viral'?b.v3-a.v3 : sort==='spend'?b.c-a.c : b.r-a.r); // Simplified logic
+            document.getElementById('videoList').innerHTML = sorted.slice(0,50).map(v => `<div class="bg-white p-2 rounded border border-gray-100 flex justify-between items-center mb-2 shadow-sm"><div class="overflow-hidden"><div class="text-xs font-bold text-blue-700 truncate w-32">${v.k}</div><div class="text-[10px] text-gray-500">3s: <b>${formatNum(v.v3)}</b></div></div><div class="text-right"><div class="text-[10px] text-gray-400">${formatMoney(v.c)}</div><div class="text-xs font-bold ${v.r>=2?'text-green-600':'text-orange-500'}">ROAS: ${v.r.toFixed(2)}</div></div></div>`).join('');
+        }
+
+        // --- 4. HELPERS ---
+        function addSkuBlock() {
+            const c = document.getElementById('metricsContainer');
+            const n = c.children.length + 1;
+            const d = document.createElement('div');
+            d.className = 'sku-block bg-white p-3 rounded-lg border border-gray-200 relative pt-6 mt-3 shadow-sm';
+            d.innerHTML = `<div class="absolute -left-2 -top-2 bg-gray-500 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-bold z-10 index-badge shadow ring-2 ring-white">${n}</div><button type="button" onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-300 hover:text-red-500 p-2"><i class="fa-solid fa-times"></i></button><div class="space-y-2"><input type="text" name="sku" list="listSkus" placeholder="SKU..." required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 bg-green-50/50 font-medium"><input type="text" name="video" list="listVideos" placeholder="Video..." required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9"><div class="grid grid-cols-2 gap-2"><div class="relative"><span class="absolute left-2 top-2 text-xs text-gray-400">$</span><input type="number" name="cost" step="0.01" placeholder="Cost" required class="pl-4 w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right font-mono text-red-600 font-bold bg-red-50/30"></div><div class="relative"><span class="absolute left-2 top-2 text-xs text-gray-400">$</span><input type="number" name="gmv" step="0.01" placeholder="GMV" required class="pl-4 w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right font-mono text-green-600 font-bold bg-green-50/30"></div></div><div class="grid grid-cols-2 gap-2"><input type="number" name="purchases" placeholder="Orders" required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right"><input type="number" name="impressions" placeholder="Imp" required class="w-full text-sm border-gray-300 rounded-md border p-2 h-9 text-right"></div><div class="grid grid-cols-3 gap-1"><input type="number" name="clicks" placeholder="Click" required class="w-full text-[11px] border-gray-300 rounded-md border p-1 h-8 text-right"><input type="number" name="views2s" placeholder="2s" required class="w-full text-[11px] border-gray-300 rounded-md border p-1 h-8 text-right"><input type="number" name="views3s" placeholder="3s" required class="w-full text-[11px] border-blue-200 bg-blue-50 rounded-md border p-1 h-8 text-right font-semibold"></div></div>`;
+            c.appendChild(d);
+        }
+
+        function switchTab(t) {
+            ['input','overview','product','campaign','creative'].forEach(i => {
+                document.getElementById('content-'+i).classList.add('hidden');
+                document.getElementById('tab-'+i).classList.replace('tab-active','tab-inactive');
+            });
+            document.getElementById('content-'+t).classList.remove('hidden');
+            document.getElementById('tab-'+t).classList.replace('tab-inactive','tab-active');
+            renderAll();
+        }
+
+        function updateCampFilter() {
+            const s = document.getElementById('globalShopFilter').value;
+            const c = [...new Set((s==='all'?appData:appData.filter(i=>i.shop===s)).map(i=>i.campName))].sort();
+            document.getElementById('globalCampFilter').innerHTML = `<option value="all">📊 Tất cả Camp</option>` + c.map(v=>`<option value="${v}">${v}</option>`).join('');
+        }
+
+        function resetForm() {
+            editingId = null; document.getElementById('dataForm').reset();
+            document.getElementById('inputDate').valueAsDate = new Date();
+            document.getElementById('formTitle').innerText = "Thêm Dữ Liệu";
+            document.getElementById('btnCancelEdit').classList.add('hidden');
+            const c = document.getElementById('metricsContainer'); while(c.children.length>1) c.removeChild(c.lastChild);
+        }
+
+        function editRow(id) {
+            const i = appData.find(x => x.id === id); if(!i) return;
+            document.getElementById('inputDate').value = i.date;
+            document.getElementById('inputShop').value = i.shop;
+            document.getElementById('inputCampName').value = i.campName;
+            document.getElementById('inputCampType').value = i.campType;
+            
+            const c = document.getElementById('metricsContainer'); while(c.children.length>1) c.removeChild(c.lastChild);
+            const b = c.children[0];
+            b.querySelector('[name="sku"]').value = i.sku;
+            b.querySelector('[name="video"]').value = i.video;
+            b.querySelector('[name="cost"]').value = i.cost;
+            b.querySelector('[name="gmv"]').value = i.gmv;
+            b.querySelector('[name="purchases"]').value = i.purchases;
+            b.querySelector('[name="impressions"]').value = i.impressions;
+            b.querySelector('[name="clicks"]').value = i.clicks;
+            b.querySelector('[name="views2s"]').value = i.views2s;
+            b.querySelector('[name="views3s"]').value = i.views3s||0;
+
+            editingId = id;
+            document.getElementById('formTitle').innerText = "Sửa Dữ Liệu";
+            document.getElementById('btnCancelEdit').classList.remove('hidden');
+            switchTab('input');
+        }
+
+        function delRow(id) { if(confirm("Xóa dòng này?")) { appData = appData.filter(i=>i.id!==id); saveData(); renderAll(); } }
+        function clearData() { if(confirm("XÓA HẾT?")) { appData = []; saveData(); renderAll(); } }
+        function setSkuMode(m) { skuMode = m; document.getElementById('btnSkuGlobal').className = m==='global'?'px-3 py-1 text-[10px] font-bold rounded bg-blue-50 text-blue-600':'px-3 py-1 text-[10px] font-bold rounded text-gray-500'; document.getElementById('btnSkuDetailed').className = m==='detailed'?'px-3 py-1 text-[10px] font-bold rounded bg-blue-50 text-blue-600':'px-3 py-1 text-[10px] font-bold rounded text-gray-500'; document.getElementById('colCampName').classList.toggle('hidden', m!=='detailed'); renderProduct(); }
+        function updateDatalists() { 
+            const c=[...new Set(appData.map(i=>i.campName))], s=[...new Set(appData.map(i=>i.sku))], v=[...new Set(appData.map(i=>i.video))];
+            document.getElementById('listCampNames').innerHTML = c.map(x=>`<option value="${x}">`).join('');
+            document.getElementById('listSkus').innerHTML = s.map(x=>`<option value="${x}">`).join('');
+            document.getElementById('listVideos').innerHTML = v.map(x=>`<option value="${x}">`).join('');
+        }
+        function exportData() { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(appData)); a.download="gmv_backup.json"; document.body.appendChild(a); a.click(); a.remove(); }
+        function importData(inp) { const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=e=>{ try { const d=JSON.parse(e.target.result); if(Array.isArray(d)) { appData=d; saveData(); renderAll(); updateDatalists(); alert("Đã nhập!"); } } catch(err) { alert("File lỗi"); } }; r.readAsText(f); inp.value=''; }
+    </script>
+</body>
+</html>
