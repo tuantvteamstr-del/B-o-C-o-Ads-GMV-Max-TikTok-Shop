@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMV Max V6 - Auto Save & Backup</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 600; background-color: #eff6ff; }
+        .tab-inactive { color: #6b7280; }
+        .tab-inactive:hover { color: #374151; background-color: #f9fafb; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .editing-row { background-color: #fff7ed !important; border-left: 4px solid #f97316; }
+        .sku-block { transition: all 0.3s ease; }
+        .sku-block:hover { border-color: #93c5fd; }
+        /* Toast Notification */
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 16px; position: fixed; z-index: 100; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 14px; opacity: 0; transition: opacity 0.5s, bottom 0.5s; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+    </style>
+</head>
+<body>
+
+    <!-- Notification Toast -->
+    <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i> Đã lưu dữ liệu thành công!</div>
+
+    <!-- Hidden File Input for Import -->
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center h-auto md:h-20 py-3 md:py-0 gap-4">
+                <div class="flex items-center w-full md:w-auto">
+                    <div class="bg-black text-white p-2 rounded mr-3">
+                        <i class="fa-brands fa-tiktok text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">GMV Max Dashboard V6</h1>
+                        <p class="text-xs text-gray-500"><i class="fa-solid fa-database mr-1"></i> Auto-Save Enabled • Backup Ready</p>
+                    </div>
+                </div>
+                
+                <!-- Global Filters -->
+                <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-3 w-full md:w-auto bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <div class="relative w-full md:w-40">
+                        <label class="block text-[10px] text-gray-500 font-bold mb-1">CHỌN SHOP</label>
+                        <select id="globalShopFilter" onchange="updateCampFilter(); renderAll()" class="appearance-none bg-white border border-gray-300 text-gray-800 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-2 font-semibold">
+                            <option value="all">🏢 Tất cả 3 Shop</option>
+                            <option value="Shop A">Shop A</option>
+                            <option value="Shop B">Shop B</option>
+                            <option value="Shop C">Shop C</option>
+                        </select>
+                    </div>
+
+                    <div class="relative w-full md:w-60">
+                        <label class="block text-[10px] text-gray-500 font-bold mb-1">CHỌN CHIẾN DỊCH</label>
+                        <select id="globalCampFilter" onchange="renderAll()" class="appearance-none bg-white border border-gray-300 text-gray-800 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-2 font-medium truncate">
+                            <option value="all">📊 Tất cả Chiến Dịch</option>
+                        </select>
+                    </div>
+
+                    <!-- Data Actions -->
+                    <div class="flex items-end h-full pt-4 md:pt-0 pl-2 space-x-2">
+                        <button onclick="exportData()" class="bg-green-100 hover:bg-green-200 text-green-700 p-2 rounded transition" title="Xuất dữ liệu ra file (Backup)">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                        <button onclick="document.getElementById('importFile').click()" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 p-2 rounded transition" title="Nhập dữ liệu từ file">
+                            <i class="fa-solid fa-upload"></i>
+                        </button>
+                        <button onclick="clearData()" class="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded transition" title="Xóa toàn bộ dữ liệu">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- Navigation Tabs -->
+        <div class="border-b border-gray-200 mb-6 overflow-x-auto">
+            <nav class="-mb-px flex space-x-1" aria-label="Tabs">
+                <button onclick="switchTab('input')" id="tab-input" class="tab-active flex-1 py-4 px-4 text-center border-b-2 font-medium text-sm rounded-t-lg">
+                    <i class="fa-solid fa-pen-to-square mr-2"></i> Nhập Liệu
+                </button>
+                <button onclick="switchTab('overview')" id="tab-overview" class="tab-inactive flex-1 py-4 px-4 text-center border-b-2 border-transparent font-medium text-sm rounded-t-lg">
+                    <i class="fa-solid fa-chart-pie mr-2"></i> Tổng Quan
+                </button>
+                <button onclick="switchTab('product')" id="tab-product" class="tab-inactive flex-1 py-4 px-4 text-center border-b-2 border-transparent font-medium text-sm rounded-t-lg">
+                    <i class="fa-solid fa-shirt mr-2"></i> Phân Tích SKU
+                </button>
+                <button onclick="switchTab('campaign')" id="tab-campaign" class="tab-inactive flex-1 py-4 px-4 text-center border-b-2 border-transparent font-medium text-sm rounded-t-lg">
+                    <i class="fa-solid fa-layer-group mr-2"></i> Sức Khỏe Camp
+                </button>
+                <button onclick="switchTab('creative')" id="tab-creative" class="tab-inactive flex-1 py-4 px-4 text-center border-b-2 border-transparent font-medium text-sm rounded-t-lg">
+                    <i class="fa-solid fa-video mr-2"></i> Video Viral (3s)
+                </button>
+            </nav>
+        </div>
+
+        <!-- TAB 1: DATA INPUT -->
+        <div id="content-input" class="block">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Form -->
+                <div class="lg:col-span-5 bg-white p-5 rounded-lg shadow-sm border-t-4 border-blue-600 h-fit sticky top-24">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                        <h2 class="text-lg font-bold text-gray-800" id="formTitle">Thêm Dữ Liệu</h2>
+                        <button onclick="resetForm()" id="btnCancelEdit" class="hidden text-xs text-red-500 hover:text-red-700 underline">Hủy sửa</button>
+                    </div>
+                    
+                    <form id="dataForm" onsubmit="handleFormSubmit(event)">
+                        <input type="hidden" id="inputId">
+
+                        <!-- Context Section -->
+                        <div class="bg-gray-50 p-3 rounded-md mb-4 border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-bold text-blue-800 uppercase">1. Thông tin Camp (Dùng chung)</label>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label class="block text-[10px] font-medium text-gray-500">Ngày</label>
+                                    <input type="date" id="inputDate" required class="w-full text-sm border-gray-300 rounded focus:ring-blue-500 border p-1.5 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-medium text-gray-500">Shop</label>
+                                    <select id="inputShop" class="w-full text-sm border-gray-300 rounded focus:ring-blue-500 border p-1.5 shadow-sm">
+                                        <option value="Shop A">Shop A</option>
+                                        <option value="Shop B">Shop B</option>
+                                        <option value="Shop C">Shop C</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-[10px] font-medium text-gray-500">Tên Chiến Dịch</label>
+                                <input type="text" id="inputCampName" list="listCampNames" placeholder="Nhập tên Camp..." required class="w-full text-sm border-gray-300 rounded focus:ring-blue-500 border p-1.5 font-semibold text-gray-800 shadow-sm">
+                                <datalist id="listCampNames"></datalist>
+                            </div>
+                            <div class="mb-1">
+                                <label class="block text-[10px] font-medium text-gray-500">Loại</label>
+                                <select id="inputCampType" class="w-full text-sm border-gray-300 rounded focus:ring-blue-500 border p-1.5 bg-white shadow-sm">
+                                    <option value="Multi-SKU">Dạng 1: Multi-SKU (Nhiều mã)</option>
+                                    <option value="Single-SKU">Dạng 2: Single-SKU (1 mã)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Data Section Container -->
+                        <div class="mb-4">
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="text-xs font-bold text-green-800 uppercase">2. Nhập Chỉ Số Metrics</label>
+                            </div>
+                            
+                            <!-- Dynamic SKU Blocks Container -->
+                            <div id="metricsContainer" class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                                <!-- First Block (Default) -->
+                                <div class="sku-block bg-white border border-gray-300 p-3 rounded-md shadow-sm relative">
+                                    <div class="absolute -left-3 top-3 bg-blue-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-bold z-10 index-badge">1</div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="block text-[10px] font-medium text-gray-500">SKU Name</label>
+                                        <input type="text" name="sku" list="listSkus" placeholder="Nhập tên SKU..." required class="w-full text-sm border-gray-300 rounded focus:ring-green-500 border p-1.5 bg-green-50 font-medium">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="block text-[10px] font-medium text-gray-500">Video ID</label>
+                                        <input type="text" name="video" list="listVideos" placeholder="Nhập ID Video..." required class="w-full text-sm border-gray-300 rounded focus:ring-green-500 border p-1.5">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500">Cost ($)</label>
+                                            <input type="number" name="cost" step="0.01" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right font-mono text-red-600">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500">GMV ($)</label>
+                                            <input type="number" name="gmv" step="0.01" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right font-mono text-green-600">
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500">Orders</label>
+                                            <input type="number" name="purchases" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500">Impressions</label>
+                                            <input type="number" name="impressions" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500">Clicks</label>
+                                            <input type="number" name="clicks" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500">2s Views</label>
+                                            <input type="number" name="views2s" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-blue-600">3s Views</label>
+                                            <input type="number" name="views3s" required class="w-full text-sm border-blue-300 bg-blue-50 rounded border p-1.5 text-right">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add SKU Button -->
+                            <button type="button" id="btnAddSku" onclick="addSkuBlock()" class="mt-3 w-full border-2 border-dashed border-green-500 text-green-600 font-bold py-2 rounded-md hover:bg-green-50 transition flex items-center justify-center">
+                                <i class="fa-solid fa-plus mr-2"></i> Thêm SKU khác vào Camp này
+                            </button>
+                        </div>
+
+                        <button type="submit" id="btnSubmit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition shadow-lg flex justify-center items-center text-sm uppercase tracking-wide">
+                            <i class="fa-solid fa-floppy-disk mr-2"></i> Lưu Tất Cả (Auto Save)
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Raw Data Table -->
+                <div class="lg:col-span-7 bg-white p-6 rounded-lg shadow-sm overflow-hidden flex flex-col h-[900px]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">Dữ Liệu Thô (Mới nhất trên cùng)</h2>
+                        <span id="recordCount" class="text-xs font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">0 records</span>
+                    </div>
+                    
+                    <div class="overflow-auto flex-1 border rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Date/Shop</th>
+                                    <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Campaign Info</th>
+                                    <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">SKU / Video</th>
+                                    <th class="px-3 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Performance ($)</th>
+                                    <th class="px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rawDataTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Global Datalists (Outside form) -->
+            <datalist id="listCampNames"></datalist>
+            <datalist id="listSkus"></datalist>
+            <datalist id="listVideos"></datalist>
+        </div>
+
+        <!-- TAB 2: OVERVIEW -->
+        <div id="content-overview" class="hidden">
+            <!-- Info Bar -->
+            <div class="mb-4 flex items-center justify-between bg-white p-3 rounded shadow-sm">
+                <div class="text-sm text-gray-600">
+                    <i class="fa-solid fa-filter text-blue-500 mr-2"></i>
+                    Đang xem: <span id="viewContext" class="font-bold text-blue-700">Tất cả</span>
+                </div>
+                <div class="text-xs text-gray-400 italic">Dữ liệu được cập nhật theo thời gian thực</div>
+            </div>
+
+            <!-- SHOP PERFORMANCE ROW -->
+            <div class="mb-6">
+                 <h3 class="text-sm font-bold text-gray-800 mb-3 uppercase flex items-center">
+                    <i class="fa-solid fa-store mr-2 text-indigo-600"></i> Hiệu Suất Từng Kênh (Shop Performance)
+                </h3>
+                <div id="shopPerformanceContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Cards will be injected here -->
+                </div>
+            </div>
+
+            <!-- Dashboard Charts Area -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Top SKU Win -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <h3 class="text-xs font-bold text-gray-700 mb-3 uppercase flex items-center">
+                        <i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> Top Winners (ROI > 0)
+                    </h3>
+                    <div class="overflow-y-auto max-h-56">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-50 text-gray-500 sticky top-0">
+                                <tr><th class="p-2 text-left">SKU</th><th class="p-2 text-right">Profit</th><th class="p-2 text-center">ROI</th></tr>
+                            </thead>
+                            <tbody id="topSkuBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Top SKU Fail -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <h3 class="text-xs font-bold text-gray-700 mb-3 uppercase flex items-center">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500 mr-2"></i> Needs Attention (ROI < 0)
+                    </h3>
+                    <div class="overflow-y-auto max-h-56">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-50 text-gray-500 sticky top-0">
+                                <tr><th class="p-2 text-left">SKU</th><th class="p-2 text-right">Loss</th><th class="p-2 text-center">ROI</th></tr>
+                            </thead>
+                            <tbody id="badSkuBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                 <!-- Cost Distribution -->
+                 <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col">
+                    <h3 class="text-xs font-bold text-gray-700 mb-2 uppercase text-center">Cost Distribution</h3>
+                    <div class="flex-1 relative">
+                        <canvas id="chartPie"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Trend Chart -->
+            <div class="bg-white p-5 rounded-lg shadow-sm">
+                <h3 class="text-sm font-bold text-gray-800 mb-4">Hiệu suất theo thời gian (Trend Performance)</h3>
+                <div class="h-72 w-full relative">
+                    <canvas id="chartTrend"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: PRODUCT ANALYSIS (Advanced) -->
+        <div id="content-product" class="hidden">
+            <div class="bg-white p-6 rounded-lg shadow-sm">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-5 pb-3 border-b">
+                    <h2 class="text-lg font-bold text-gray-800">Phân Tích SKU</h2>
+                    
+                    <!-- Toggle Switch -->
+                    <div class="flex items-center bg-gray-100 p-1 rounded-lg mt-3 md:mt-0">
+                        <button onclick="setSkuMode('global')" id="btnSkuGlobal" class="px-4 py-2 text-xs font-bold rounded-md shadow bg-white text-blue-600 transition">Gộp Toàn Hệ Thống</button>
+                        <button onclick="setSkuMode('detailed')" id="btnSkuDetailed" class="px-4 py-2 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition">Chi tiết từng Camp</button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">SKU / Product</th>
+                                <th id="colCampName" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase hidden">Thuộc Camp</th>
+                                <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Cost ($)</th>
+                                <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">GMV ($)</th>
+                                <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Orders</th>
+                                <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">CPA</th>
+                                <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">ROI</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Suggestion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="skuTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: CAMPAIGN HEALTH -->
+        <div id="content-campaign" class="hidden">
+            <div id="campaignHealthContainer" class="space-y-8"></div>
+        </div>
+
+        <!-- TAB 5: VIDEO VIRAL -->
+        <div id="content-creative" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[750px]">
+                <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm flex flex-col">
+                    <h3 class="text-sm font-bold text-gray-800 mb-2">Ma trận Video: Viral vs Conversion</h3>
+                    <p class="text-xs text-gray-500 mb-4">Trục Y: Impressions (Viral) | Trục X: ROAS (Hiệu quả)</p>
+                    <div class="flex-1 relative">
+                        <canvas id="chartVideoScatter"></canvas>
+                    </div>
+                </div>
+                
+                <div class="lg:col-span-1 bg-white p-0 rounded-lg shadow-sm flex flex-col overflow-hidden border border-gray-200">
+                    <div class="p-4 bg-gray-50 border-b border-gray-200">
+                        <h3 class="text-sm font-bold text-gray-800 mb-2">Top Videos</h3>
+                        <div class="flex gap-2">
+                            <select id="videoSort" onchange="renderCreativeAnalysis()" class="text-xs border rounded p-1 flex-1">
+                                <option value="viral3s">🔥 3s Views (Mới)</option>
+                                <option value="viral">👀 Views Tổng</option>
+                                <option value="spend">💰 Spend Nhiều Nhất</option>
+                                <option value="roas">💎 ROAS Cao Nhất</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto flex-1 p-3 space-y-3 bg-gray-50" id="videoList"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- 1. CONFIG & STATE ---
+        // Load from LocalStorage
+        let appData = JSON.parse(localStorage.getItem('gmv_max_data')) || [];
+        
+        let editingId = null;
+        let skuMode = 'global';
+        const tabs = ['input', 'overview', 'product', 'campaign', 'creative'];
+        let charts = {};
+
+        // Currency Formatter ($)
+        const formatMoney = (num) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+        const formatNum = (num) => new Intl.NumberFormat('en-US').format(num);
+
+        // --- 2. INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('inputDate').valueAsDate = new Date();
+            renderAll();
+            updateDatalists();
+        });
+
+        // --- 3. STORAGE & TOAST HELPERS ---
+        function saveData() {
+            localStorage.setItem('gmv_max_data', JSON.stringify(appData));
+            showToast();
+        }
+
+        function showToast() {
+            const t = document.getElementById('toast');
+            t.className = "show";
+            setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "gmv_max_backup_" + new Date().toISOString().split('T')[0] + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if(Array.isArray(json)) {
+                        if(confirm(`Bạn có chắc muốn nhập dữ liệu? Hành động này sẽ GHI ĐÈ dữ liệu hiện tại.`)) {
+                            appData = json;
+                            saveData();
+                            renderAll();
+                            updateDatalists();
+                            alert("Nhập dữ liệu thành công!");
+                        }
+                    } else {
+                        alert("File không đúng định dạng!");
+                    }
+                } catch(err) {
+                    alert("Lỗi khi đọc file!");
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // reset
+        }
+
+        // --- 4. DYNAMIC FORM LOGIC ---
+        function addSkuBlock() {
+            const container = document.getElementById('metricsContainer');
+            const count = container.children.length + 1;
+            
+            const block = document.createElement('div');
+            block.className = 'sku-block bg-white border border-gray-300 p-3 rounded-md shadow-sm relative mt-3';
+            block.innerHTML = `
+                <div class="absolute -left-3 top-3 bg-gray-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-bold z-10 index-badge">${count}</div>
+                <button type="button" onclick="removeSkuBlock(this)" class="absolute top-2 right-2 text-red-400 hover:text-red-600"><i class="fa-solid fa-times"></i></button>
+                
+                <div class="mb-3">
+                    <label class="block text-[10px] font-medium text-gray-500">SKU Name</label>
+                    <input type="text" name="sku" list="listSkus" placeholder="Nhập tên SKU..." required class="w-full text-sm border-gray-300 rounded focus:ring-green-500 border p-1.5 bg-green-50 font-medium">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-[10px] font-medium text-gray-500">Video ID</label>
+                    <input type="text" name="video" list="listVideos" placeholder="Nhập ID Video..." required class="w-full text-sm border-gray-300 rounded focus:ring-green-500 border p-1.5">
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-[10px] font-medium text-gray-500">Cost ($)</label>
+                        <input type="number" name="cost" step="0.01" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right font-mono text-red-600">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-medium text-gray-500">GMV ($)</label>
+                        <input type="number" name="gmv" step="0.01" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right font-mono text-green-600">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-[10px] font-medium text-gray-500">Orders</label>
+                        <input type="number" name="purchases" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-medium text-gray-500">Impressions</label>
+                        <input type="number" name="impressions" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-medium text-gray-500">Clicks</label>
+                        <input type="number" name="clicks" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-medium text-gray-500">2s Views</label>
+                        <input type="number" name="views2s" required class="w-full text-sm border-gray-300 rounded border p-1.5 text-right">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-blue-600">3s Views</label>
+                        <input type="number" name="views3s" required class="w-full text-sm border-blue-300 bg-blue-50 rounded border p-1.5 text-right">
+                    </div>
+                </div>
+            `;
+            container.appendChild(block);
+        }
+
+        function removeSkuBlock(btn) {
+            const block = btn.closest('.sku-block');
+            block.remove();
+            document.querySelectorAll('.sku-block').forEach((el, idx) => {
+                const badge = el.querySelector('.index-badge');
+                if(badge) {
+                    badge.textContent = idx + 1;
+                    if(idx === 0) badge.className = "absolute -left-3 top-3 bg-blue-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-bold z-10 index-badge";
+                    else badge.className = "absolute -left-3 top-3 bg-gray-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full font-bold z-10 index-badge";
+                }
+            });
+        }
+
+        // --- 5. DATA HANDLING ---
+        function checkSkuConflict(sku, shop, date, currentCamp) {
+            const conflict = appData.find(i => 
+                i.sku === sku && 
+                i.shop === shop && 
+                i.date === date && 
+                i.campName !== currentCamp
+            );
+            return conflict;
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const date = document.getElementById('inputDate').value;
+            const shop = document.getElementById('inputShop').value;
+            const campName = document.getElementById('inputCampName').value;
+            const campType = document.getElementById('inputCampType').value;
+            
+            const blocks = document.querySelectorAll('.sku-block');
+            const newRecords = [];
+            
+            for (const block of blocks) {
+                const sku = block.querySelector('[name="sku"]').value;
+                if(!sku) continue;
+
+                if (!editingId) {
+                    const conflict = checkSkuConflict(sku, shop, date, campName);
+                    if (conflict) {
+                        const confirmAdd = confirm(`⚠️ CẢNH BÁO!\n\nSản phẩm "${sku}" đã tồn tại trong chiến dịch "${conflict.campName}" của ${shop} vào ngày ${date}.\n\nBỏ qua SKU này? (OK = Bỏ qua)`);
+                        if (confirmAdd) continue;
+                    }
+                }
+
+                newRecords.push({
+                    id: editingId || Date.now() + Math.random(),
+                    date: date,
+                    shop: shop,
+                    campName: campName,
+                    campType: campType,
+                    sku: sku,
+                    video: block.querySelector('[name="video"]').value,
+                    cost: parseFloat(block.querySelector('[name="cost"]').value) || 0,
+                    gmv: parseFloat(block.querySelector('[name="gmv"]').value) || 0,
+                    purchases: parseInt(block.querySelector('[name="purchases"]').value) || 0,
+                    impressions: parseInt(block.querySelector('[name="impressions"]').value) || 0,
+                    clicks: parseInt(block.querySelector('[name="clicks"]').value) || 0,
+                    views2s: parseInt(block.querySelector('[name="views2s"]').value) || 0,
+                    views3s: parseInt(block.querySelector('[name="views3s"]').value) || 0,
+                });
+            }
+
+            if (newRecords.length === 0) {
+                alert("Không có dữ liệu hợp lệ.");
+                return;
+            }
+
+            if (editingId) {
+                const idx = appData.findIndex(i => i.id === editingId);
+                if (idx !== -1 && newRecords.length > 0) appData[idx] = newRecords[0];
+                resetForm();
+            } else {
+                appData.push(...newRecords);
+                document.getElementById('dataForm').reset();
+                document.getElementById('inputDate').valueAsDate = new Date();
+                const container = document.getElementById('metricsContainer');
+                while(container.children.length > 1) container.removeChild(container.lastChild);
+            }
+
+            saveData(); // Persistent save
+            updateCampFilter();
+            renderInputTable();
+            updateDatalists();
+        }
+
+        function resetForm() {
+            editingId = null;
+            document.getElementById('dataForm').reset();
+            document.getElementById('inputDate').valueAsDate = new Date();
+            document.getElementById('formTitle').innerText = "Thêm Dữ Liệu";
+            document.getElementById('btnCancelEdit').classList.add('hidden');
+            document.getElementById('btnSubmit').innerHTML = `<i class="fa-solid fa-floppy-disk mr-2"></i> Lưu Tất Cả (Auto Save)`;
+            document.getElementById('btnSubmit').className = "w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition shadow-lg flex justify-center items-center text-sm uppercase tracking-wide";
+            document.getElementById('btnAddSku').classList.remove('hidden');
+            const container = document.getElementById('metricsContainer');
+            while(container.children.length > 1) container.removeChild(container.lastChild);
+        }
+
+        function editRow(id) {
+            const item = appData.find(i => i.id === id);
+            if (!item) return;
+            
+            document.getElementById('inputDate').value = item.date;
+            document.getElementById('inputShop').value = item.shop;
+            document.getElementById('inputCampName').value = item.campName;
+            document.getElementById('inputCampType').value = item.campType;
+            
+            const container = document.getElementById('metricsContainer');
+            while(container.children.length > 1) container.removeChild(container.lastChild);
+            
+            const block = container.children[0];
+            block.querySelector('[name="sku"]').value = item.sku;
+            block.querySelector('[name="video"]').value = item.video;
+            block.querySelector('[name="cost"]').value = item.cost;
+            block.querySelector('[name="gmv"]').value = item.gmv;
+            block.querySelector('[name="purchases"]').value = item.purchases;
+            block.querySelector('[name="impressions"]').value = item.impressions;
+            block.querySelector('[name="clicks"]').value = item.clicks;
+            block.querySelector('[name="views2s"]').value = item.views2s;
+            block.querySelector('[name="views3s"]').value = item.views3s || 0;
+
+            editingId = id;
+            document.getElementById('formTitle').innerText = "Đang sửa dữ liệu...";
+            document.getElementById('btnCancelEdit').classList.remove('hidden');
+            document.getElementById('btnSubmit').innerHTML = `<i class="fa-solid fa-save mr-2"></i> Cập Nhật`;
+            document.getElementById('btnSubmit').className = "w-full bg-orange-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-orange-600 transition shadow-lg flex justify-center items-center text-sm uppercase tracking-wide";
+            document.getElementById('btnAddSku').classList.add('hidden');
+            
+            document.getElementById('content-input').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function getGlobalFilter() {
+            const s = document.getElementById('globalShopFilter').value;
+            const c = document.getElementById('globalCampFilter').value;
+            return { shop: s, camp: c };
+        }
+
+        function getFilteredData() {
+            const { shop, camp } = getGlobalFilter();
+            let d = appData;
+            if (shop !== 'all') d = d.filter(i => i.shop === shop);
+            if (camp !== 'all') d = d.filter(i => i.campName === camp);
+            return d;
+        }
+
+        function updateCampFilter() {
+            const shop = document.getElementById('globalShopFilter').value;
+            const campSelect = document.getElementById('globalCampFilter');
+            const currentCamp = campSelect.value;
+            
+            let camps = [];
+            if(shop === 'all') {
+                camps = [...new Set(appData.map(i => i.campName))];
+            } else {
+                camps = [...new Set(appData.filter(i => i.shop === shop).map(i => i.campName))];
+            }
+            camps.sort();
+            campSelect.innerHTML = `<option value="all">📊 Tất cả Chiến Dịch</option>` + camps.map(c => `<option value="${c}">${c}</option>`).join('');
+            if(camps.includes(currentCamp)) campSelect.value = currentCamp;
+        }
+
+        function switchTab(tab) {
+            tabs.forEach(t => {
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active');
+                document.getElementById(`tab-${t}`).classList.add('tab-inactive');
+            });
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('tab-active');
+            document.getElementById(`tab-${tab}`).classList.remove('tab-inactive');
+            if(tab !== 'input') renderAll();
+        }
+        
+        function setSkuMode(mode) {
+            skuMode = mode;
+            document.getElementById('btnSkuGlobal').className = mode === 'global' ? "px-4 py-2 text-xs font-bold rounded-md shadow bg-white text-blue-600 transition" : "px-4 py-2 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition";
+            document.getElementById('btnSkuDetailed').className = mode === 'detailed' ? "px-4 py-2 text-xs font-bold rounded-md shadow bg-white text-blue-600 transition" : "px-4 py-2 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition";
+            const col = document.getElementById('colCampName');
+            if(mode === 'detailed') col.classList.remove('hidden'); else col.classList.add('hidden');
+            renderProductAnalysis();
+        }
+        
+        function deleteRow(id) {
+            if(confirm("Xóa dòng này?")) {
+                appData = appData.filter(i => i.id !== id);
+                saveData();
+                renderInputTable();
+                updateCampFilter();
+            }
+        }
+        function clearData() { 
+            if(confirm("CẢNH BÁO: Xóa HẾT dữ liệu? Hành động này không thể hoàn tác!")) { 
+                appData = []; 
+                saveData(); 
+                renderAll(); 
+                updateCampFilter(); 
+            } 
+        }
+        
+        function updateDatalists() {
+            const camps = [...new Set(appData.map(i => i.campName))];
+            document.getElementById('listCampNames').innerHTML = camps.map(c => `<option value="${c}">`).join('');
+            const skus = [...new Set(appData.map(i => i.sku))];
+            document.getElementById('listSkus').innerHTML = skus.map(s => `<option value="${s}">`).join('');
+            const vids = [...new Set(appData.map(i => i.video))];
+            document.getElementById('listVideos').innerHTML = vids.map(v => `<option value="${v}">`).join('');
+        }
+
+        function renderAll() {
+            const { shop, camp } = getGlobalFilter();
+            let label = shop === 'all' ? 'Tất cả Shop' : shop;
+            if(camp !== 'all') label += ` > ${camp}`;
+            document.getElementById('viewContext').innerText = label;
+
+            renderInputTable();
+            renderOverview();
+            renderProductAnalysis();
+            renderCampaignHealth();
+            renderCreativeAnalysis();
+        }
+
+        function renderInputTable() {
+            const data = getFilteredData().sort((a,b) => b.id - a.id).slice(0, 100);
+            document.getElementById('recordCount').innerText = `${data.length} recent records`;
+            const tbody = document.getElementById('rawDataTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(item => {
+                tbody.innerHTML += `
+                    <tr class="${editingId === item.id ? 'editing-row' : ''} hover:bg-gray-50 transition">
+                        <td class="px-3 py-2 border-b">
+                            <div class="text-[10px] text-gray-500">${item.date}</div>
+                            <div class="text-xs font-bold text-gray-800">${item.shop}</div>
+                        </td>
+                        <td class="px-3 py-2 border-b">
+                            <div class="text-xs font-medium text-blue-700 truncate w-32" title="${item.campName}">${item.campName}</div>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">${item.campType === 'Multi-SKU' ? 'Multi' : 'Single'}</span>
+                        </td>
+                        <td class="px-3 py-2 border-b">
+                            <div class="text-xs font-bold text-gray-700 truncate w-24">${item.sku}</div>
+                            <div class="text-[9px] text-gray-400 truncate w-24">${item.video}</div>
+                        </td>
+                        <td class="px-3 py-2 text-right border-b">
+                            <div class="text-xs font-bold text-green-600">${formatMoney(item.gmv)}</div>
+                            <div class="text-[10px] text-red-500">-${formatMoney(item.cost)}</div>
+                        </td>
+                        <td class="px-3 py-2 text-center border-b">
+                             <button onclick="editRow(${item.id})" class="text-blue-500 hover:text-blue-700 mx-1"><i class="fa-solid fa-pen"></i></button>
+                             <button onclick="deleteRow(${item.id})" class="text-red-500 hover:text-red-700 mx-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderOverview() {
+            const data = getFilteredData();
+            
+            const shopContainer = document.getElementById('shopPerformanceContainer');
+            shopContainer.innerHTML = '';
+            ['Shop A', 'Shop B', 'Shop C'].forEach(s => {
+                const shopItems = appData.filter(i => i.shop === s);
+                const sCost = shopItems.reduce((sum, i) => sum + i.cost, 0);
+                const sGmv = shopItems.reduce((sum, i) => sum + i.gmv, 0);
+                const sRoi = sCost > 0 ? (sGmv - sCost)/sCost : 0;
+                let roiColor = sRoi < 0 ? 'text-red-500' : (sRoi < 1.5 ? 'text-yellow-600' : 'text-green-600');
+                
+                shopContainer.innerHTML += `
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center">
+                        <h4 class="font-bold text-gray-800 text-sm mb-2">${s}</h4>
+                        <div class="w-full flex justify-between text-xs mb-1 px-4"><span class="text-gray-500">Cost:</span><span class="font-mono text-gray-800">${formatMoney(sCost)}</span></div>
+                        <div class="w-full flex justify-between text-xs mb-3 px-4 border-b pb-2"><span class="text-gray-500">GMV:</span><span class="font-mono text-gray-800">${formatMoney(sGmv)}</span></div>
+                        <div class="text-center"><span class="text-[10px] uppercase text-gray-400 font-bold">ROI</span><div class="text-2xl font-bold ${roiColor}">${sRoi.toFixed(2)}</div></div>
+                    </div>
+                `;
+            });
+
+            const ctxPie = document.getElementById('chartPie').getContext('2d');
+            if(charts.pie) charts.pie.destroy();
+            let pieLabels = [], pieData = [];
+            ['Shop A', 'Shop B', 'Shop C'].forEach(s => {
+                 pieLabels.push(s);
+                 pieData.push(appData.filter(i => i.shop === s).reduce((sum,i) => sum + i.cost, 0));
+            });
+            charts.pie = new Chart(ctxPie, {
+                 type: 'doughnut',
+                 data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: ['#3b82f6', '#ef4444', '#10b981'] }] },
+                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            const skuMap = {};
+            data.forEach(i => {
+                if(!skuMap[i.sku]) skuMap[i.sku] = { sku: i.sku, gmv: 0, cost: 0 };
+                skuMap[i.sku].gmv += i.gmv;
+                skuMap[i.sku].cost += i.cost;
+            });
+            let skus = Object.values(skuMap);
+            skus.forEach(s => {
+                s.profit = s.gmv - s.cost;
+                s.roi = s.cost > 0 ? s.profit/s.cost : -1;
+            });
+            const wins = skus.filter(s => s.roi > 0 && s.cost > 0).sort((a,b) => b.roi - a.roi).slice(0, 50);
+            document.getElementById('topSkuBody').innerHTML = wins.map(s => `
+                <tr class="border-b border-gray-50"><td class="p-2 truncate max-w-[100px] font-medium" title="${s.sku}">${s.sku}</td><td class="p-2 text-right text-green-600 font-bold">+${formatMoney(s.profit)}</td><td class="p-2 text-center text-xs bg-green-50 rounded text-green-800">${s.roi.toFixed(2)}</td></tr>
+            `).join('');
+            const loss = skus.filter(s => s.roi < 0 && s.cost > 0).sort((a,b) => a.roi - b.roi).slice(0, 50);
+            document.getElementById('badSkuBody').innerHTML = loss.map(s => `
+                <tr class="border-b border-gray-50"><td class="p-2 truncate max-w-[100px] font-medium" title="${s.sku}">${s.sku}</td><td class="p-2 text-right text-red-500 font-bold">${formatMoney(s.profit)}</td><td class="p-2 text-center text-xs bg-red-50 rounded text-red-800">${s.roi.toFixed(2)}</td></tr>
+            `).join('');
+
+            const dates = [...new Set(data.map(i => i.date))].sort();
+            const trendRoi = dates.map(d => {
+                const dayData = data.filter(i => i.date === d);
+                const c = dayData.reduce((s,i) => s + i.cost, 0);
+                const g = dayData.reduce((s,i) => s + i.gmv, 0);
+                return c > 0 ? (g-c)/c : 0;
+            });
+            const ctxTrend = document.getElementById('chartTrend').getContext('2d');
+            if(charts.trend) charts.trend.destroy();
+            charts.trend = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{ label: 'Daily ROI', data: trendRoi, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function renderProductAnalysis() {
+            const data = getFilteredData();
+            const tbody = document.getElementById('skuTableBody');
+            tbody.innerHTML = '';
+            const groupKey = (item) => skuMode === 'global' ? item.sku : `${item.sku}||${item.campName}`;
+            const map = {};
+            data.forEach(i => {
+                const k = groupKey(i);
+                if(!map[k]) map[k] = { sku: i.sku, campName: i.campName, cost: 0, gmv: 0, orders: 0, clicks: 0 };
+                map[k].cost += i.cost;
+                map[k].gmv += i.gmv;
+                map[k].orders += i.purchases;
+                map[k].clicks += i.clicks;
+            });
+            const rows = Object.values(map).sort((a,b) => b.cost - a.cost);
+            rows.forEach(r => {
+                const roi = r.cost > 0 ? (r.gmv - r.cost)/r.cost : -1;
+                const cpa = r.orders > 0 ? r.cost/r.orders : 0;
+                let bg = ""; let msg = "";
+                if(roi < 0) { bg = "bg-red-50 text-red-700"; msg = "Decrease Bid / Pause"; }
+                else if (roi < 1.5) { bg = "bg-yellow-50 text-yellow-700"; msg = "Optimize Video"; }
+                else { bg = "bg-green-50 text-green-700"; msg = "Scale Up"; }
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="px-4 py-3 text-sm font-bold text-gray-800">${r.sku}</td>
+                        <td class="${skuMode === 'detailed' ? '' : 'hidden'} px-4 py-3 text-xs text-blue-600">${r.campName}</td>
+                        <td class="px-4 py-3 text-right text-xs font-mono text-red-500">${formatMoney(r.cost)}</td>
+                        <td class="px-4 py-3 text-right text-xs font-mono text-green-600">${formatMoney(r.gmv)}</td>
+                        <td class="px-4 py-3 text-center text-xs">${r.orders}</td>
+                        <td class="px-4 py-3 text-center text-xs text-gray-500">${formatMoney(cpa)}</td>
+                        <td class="px-4 py-3 text-center text-sm font-bold ${bg} rounded">${roi.toFixed(2)}</td>
+                        <td class="px-4 py-3 text-xs italic text-gray-500">${msg}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderCampaignHealth() {
+            const data = getFilteredData();
+            const container = document.getElementById('campaignHealthContainer');
+            container.innerHTML = '';
+            const shops = [...new Set(data.map(i => i.shop))];
+            shops.forEach(shopName => {
+                const shopData = data.filter(i => i.shop === shopName);
+                if(shopData.length === 0) return;
+                const campMap = {};
+                shopData.forEach(i => {
+                    if(!campMap[i.campName]) campMap[i.campName] = { name: i.campName, type: i.campType, cost: 0, gmv: 0, orders: 0 };
+                    campMap[i.campName].cost += i.cost;
+                    campMap[i.campName].gmv += i.gmv;
+                    campMap[i.campName].orders += i.purchases;
+                });
+                const camps = Object.values(campMap).sort((a,b) => b.cost - a.cost);
+                let rowsHTML = camps.map(c => {
+                    const roi = c.cost > 0 ? (c.gmv - c.cost)/c.cost : -1;
+                    const roas = c.cost > 0 ? c.gmv/c.cost : 0;
+                    return `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-sm font-medium text-gray-700">${c.name}</td><td class="p-3 text-xs text-center"><span class="px-2 py-1 rounded bg-gray-100">${c.type === 'Multi-SKU' ? 'Multi' : 'Single'}</span></td><td class="p-3 text-right text-xs text-gray-600 font-mono">${formatMoney(c.cost)}</td><td class="p-3 text-right text-xs text-gray-600 font-mono">${formatMoney(c.gmv)}</td><td class="p-3 text-center text-xs font-bold ${roi < 0 ? 'text-red-500' : 'text-green-500'}">${roi.toFixed(2)}</td><td class="p-3 text-center text-xs text-blue-600">${roas.toFixed(2)}</td></tr>`;
+                }).join('');
+                container.innerHTML += `<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"><div class="bg-gray-100 px-4 py-3 border-b flex justify-between items-center"><h3 class="font-bold text-gray-800"><i class="fa-solid fa-store mr-2 text-blue-500"></i> ${shopName}</h3><span class="text-xs text-gray-500">${camps.length} campaigns</span></div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-3 text-left text-xs uppercase">Camp Name</th><th class="p-3 text-center text-xs uppercase">Type</th><th class="p-3 text-right text-xs uppercase">Cost</th><th class="p-3 text-right text-xs uppercase">GMV</th><th class="p-3 text-center text-xs uppercase">ROI</th><th class="p-3 text-center text-xs uppercase">ROAS</th></tr></thead><tbody>${rowsHTML}</tbody></table></div></div>`;
+            });
+        }
+
+        function renderCreativeAnalysis() {
+            const data = getFilteredData();
+            const sortMode = document.getElementById('videoSort').value;
+            const map = {};
+            data.forEach(i => {
+                if(!map[i.video]) map[i.video] = { id: i.video, cost: 0, gmv: 0, imps: 0, clicks: 0, orders: 0, views3s: 0 };
+                map[i.video].cost += i.cost;
+                map[i.video].gmv += i.gmv;
+                map[i.video].imps += i.impressions;
+                map[i.video].clicks += i.clicks;
+                map[i.video].orders += i.purchases;
+                map[i.video].views3s += (i.views3s || 0);
+            });
+            const vids = Object.values(map);
+            const scatterData = vids.map(v => ({
+                x: v.cost > 0 ? v.gmv/v.cost : 0, y: v.imps, r: Math.min(Math.max(v.orders, 5), 20), vid: v.id
+            })).filter(d => d.y > 0);
+            const ctxSc = document.getElementById('chartVideoScatter').getContext('2d');
+            if(charts.sc) charts.sc.destroy();
+            charts.sc = new Chart(ctxSc, {
+                type: 'bubble',
+                data: { datasets: [{ label: 'Video Matrix', data: scatterData, backgroundColor: 'rgba(236, 72, 153, 0.6)', borderColor: 'rgba(236, 72, 153, 1)' }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: {display: true, text: 'ROAS (Efficiency)'} }, y: { title: {display: true, text: 'Impressions (Virality)'} } }, plugins: { tooltip: { callbacks: { label: (c) => `${c.raw.vid}: ROAS ${c.raw.x.toFixed(2)}, Views ${formatNum(c.raw.y)}` } } } }
+            });
+            let sorted = [];
+            if(sortMode === 'viral') sorted = vids.sort((a,b) => b.imps - a.imps);
+            else if (sortMode === 'viral3s') sorted = vids.sort((a,b) => b.views3s - a.views3s);
+            else if (sortMode === 'spend') sorted = vids.sort((a,b) => b.cost - a.cost);
+            else sorted = vids.sort((a,b) => (b.cost > 0 ? b.gmv/b.cost : 0) - (a.cost > 0 ? a.gmv/a.cost : 0));
+            const listEl = document.getElementById('videoList');
+            listEl.innerHTML = '';
+            sorted.slice(0, 50).forEach(v => {
+                const roas = v.cost > 0 ? v.gmv/v.cost : 0;
+                listEl.innerHTML += `<div class="bg-white p-3 rounded border border-gray-200 hover:shadow-md transition"><div class="flex justify-between items-start mb-1"><span class="text-xs font-bold text-blue-800 truncate w-32" title="${v.id}">${v.id}</span><span class="text-[10px] bg-gray-100 px-1 rounded text-gray-600">${formatNum(v.imps)} views</span></div><div class="flex justify-between items-end mt-2"><div><div class="text-[10px] text-gray-500">Spend: ${formatMoney(v.cost)}</div><div class="text-[10px] text-indigo-500 font-semibold">3s Views: ${formatNum(v.views3s)}</div></div><div class="text-right"><div class="text-xs font-bold ${roas >= 2 ? 'text-green-600' : 'text-orange-500'}">ROAS: ${roas.toFixed(2)}</div></div></div></div>`;
+            });
+        }
+    </script>
+</body>
+</html>
