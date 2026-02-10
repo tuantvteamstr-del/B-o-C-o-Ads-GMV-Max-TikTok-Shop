@@ -97,9 +97,9 @@
                 <div class="flex w-full sm:w-auto gap-2">
                     <select id="globalShopFilter" onchange="updateCampFilter(); renderAll()" class="flex-1 sm:w-40 bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2 font-semibold h-9">
                         <option value="all">🏢 Tất cả Shop</option>
-                        <option value="Shop A">Shop A</option>
-                        <option value="Shop B">Shop B</option>
-                        <option value="Shop C">Shop C</option>
+                        <option value="VinartsVn">VinartsVn</option>
+                        <option value="VinartsVn LLC">VinartsVn LLC</option>
+                        <option value="LittleJoyCrafts">LittleJoyCrafts</option>
                     </select>
                     <select id="globalCampFilter" onchange="renderAll()" class="flex-1 sm:w-48 bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2 font-medium truncate h-9">
                         <option value="all">📊 Tất cả Camp</option>
@@ -161,9 +161,9 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                                     <input type="date" id="inputDate" required class="w-full text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 border p-2 h-10 shadow-sm">
                                     <select id="inputShop" class="w-full text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 border p-2 h-10 shadow-sm bg-white">
-                                        <option value="Shop A">Shop A</option>
-                                        <option value="Shop B">Shop B</option>
-                                        <option value="Shop C">Shop C</option>
+                                        <option value="VinartsVn">VinartsVn</option>
+                                        <option value="VinartsVn LLC">VinartsVn LLC</option>
+                                        <option value="LittleJoyCrafts">LittleJoyCrafts</option>
                                     </select>
                                 </div>
                                 <div class="mb-2">
@@ -421,7 +421,8 @@
 
         function renderOverview() {
             const d = getFiltered();
-            document.getElementById('shopPerformanceContainer').innerHTML = ['Shop A','Shop B','Shop C'].map(s => {
+            const shopNames = ['VinartsVn', 'VinartsVn LLC', 'LittleJoyCrafts'];
+            document.getElementById('shopPerformanceContainer').innerHTML = shopNames.map(s => {
                 const sub = appData.filter(i => i.shop===s);
                 const cost = sub.reduce((a,b)=>a+b.cost,0), gmv = sub.reduce((a,b)=>a+b.gmv,0);
                 const roi = cost>0?(gmv-cost)/cost:0;
@@ -432,8 +433,8 @@
             // Chart Pie
             const ctxP = document.getElementById('chartPie').getContext('2d');
             if(charts.pie) charts.pie.destroy();
-            const costs = ['Shop A','Shop B','Shop C'].map(s => appData.filter(i=>i.shop===s).reduce((a,b)=>a+b.cost,0));
-            charts.pie = new Chart(ctxP, { type:'doughnut', data:{labels:['A','B','C'], datasets:[{data:costs, backgroundColor:['#3b82f6','#ef4444','#10b981']}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{size:10}}}}}});
+            const costs = shopNames.map(s => appData.filter(i=>i.shop===s).reduce((a,b)=>a+b.cost,0));
+            charts.pie = new Chart(ctxP, { type:'doughnut', data:{labels:shopNames, datasets:[{data:costs, backgroundColor:['#3b82f6','#ef4444','#10b981']}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{size:10}}}}}});
 
             // Chart Trend
             const ctxT = document.getElementById('chartTrend').getContext('2d');
